@@ -42,14 +42,14 @@ DeriveClone::clone_call (std::unique_ptr<Expr> &&to_clone)
  * fn clone(&self) -> Self { <clone_expr> }
  *
  */
-std::unique_ptr<TraitImplItem>
+std::unique_ptr<AssociatedItem>
 DeriveClone::clone_fn (std::unique_ptr<Expr> &&clone_expr)
 {
   auto block = std::unique_ptr<BlockExpr> (
     new BlockExpr ({}, std::move (clone_expr), {}, {}, loc, loc));
   auto big_self_type = builder.single_type_path ("Self");
 
-  return std::unique_ptr<TraitImplItem> (
+  return std::unique_ptr<AssociatedItem> (
     new Method ({"clone"}, builder.fn_qualifiers (), /* generics */ {},
 		SelfParam (Lifetime::error (), /* is_mut */ false, loc),
 		/* function params */ {}, std::move (big_self_type),
@@ -66,7 +66,7 @@ DeriveClone::clone_fn (std::unique_ptr<Expr> &&clone_expr)
  *
  */
 std::unique_ptr<Item>
-DeriveClone::clone_impl (std::unique_ptr<TraitImplItem> &&clone_fn,
+DeriveClone::clone_impl (std::unique_ptr<AssociatedItem> &&clone_fn,
 			 std::string name)
 {
   // should that be `$crate::core::clone::Clone` instead?
@@ -74,7 +74,7 @@ DeriveClone::clone_impl (std::unique_ptr<TraitImplItem> &&clone_fn,
   segments.emplace_back (builder.type_path_segment ("Clone"));
   auto clone = TypePath (std::move (segments), loc);
 
-  auto trait_items = std::vector<std::unique_ptr<TraitImplItem>> ();
+  auto trait_items = std::vector<std::unique_ptr<AssociatedItem>> ();
   trait_items.emplace_back (std::move (clone_fn));
 
   return std::unique_ptr<Item> (

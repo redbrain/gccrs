@@ -447,7 +447,7 @@ public:
 };
 
 // A macro rules definition item AST node
-class MacroRulesDefinition : public VisItem
+class MacroRulesDefinition : public VisItem, public LocatedImpl
 {
 public:
   enum MacroKind
@@ -466,7 +466,6 @@ private:
   DelimType delim_type;
   // MacroRules rules;
   std::vector<MacroRule> rules; // inlined form
-  location_t locus;
 
   MacroTranscriberFunc associated_transcriber;
 
@@ -496,9 +495,9 @@ private:
 			std::vector<MacroRule> rules,
 			std::vector<Attribute> outer_attrs, location_t locus,
 			MacroKind kind, Visibility vis)
-    : VisItem (std::move (vis), outer_attrs),
+    : VisItem (std::move (vis), outer_attrs), LocatedImpl (locus),
       outer_attrs (std::move (outer_attrs)), rule_name (std::move (rule_name)),
-      delim_type (delim_type), rules (std::move (rules)), locus (locus),
+      delim_type (delim_type), rules (std::move (rules)),
       associated_transcriber (dummy_builtin), is_builtin_rule (false),
       kind (kind)
   {}
@@ -506,10 +505,10 @@ private:
   MacroRulesDefinition (Identifier builtin_name, DelimType delim_type,
 			MacroTranscriberFunc associated_transcriber,
 			MacroKind kind, Visibility vis)
-    : VisItem (std::move (vis), std::vector<Attribute> ()),
+    : VisItem (std::move (vis), std::vector<Attribute> ()), LocatedImpl (UNDEF_LOCATION),
       outer_attrs (std::vector<Attribute> ()), rule_name (builtin_name),
       delim_type (delim_type), rules (std::vector<MacroRule> ()),
-      locus (UNDEF_LOCATION), associated_transcriber (associated_transcriber),
+      associated_transcriber (associated_transcriber),
       is_builtin_rule (true), kind (kind)
   {}
 
@@ -551,8 +550,6 @@ public:
 
   std::vector<MacroRule> &get_macro_rules () { return rules; }
   const std::vector<MacroRule> &get_macro_rules () const { return rules; }
-
-  location_t get_locus () const override final { return locus; }
 
   Identifier get_rule_name () const { return rule_name; }
 
@@ -596,9 +593,8 @@ protected:
 class MacroInvocation : public TypeNoBounds,
 			public Pattern,
 			public Item,
-			public TraitItem,
-			public TraitImplItem,
-			public InherentImplItem,
+			public AssociatedItem,
+			virtual public LocatedImpl,
 			public ExternalItem,
 			public ExprWithoutBlock
 {
@@ -646,8 +642,6 @@ public:
 			   std::move (pending_eager_invocations)));
   }
 
-  location_t get_locus () const override final { return locus; }
-
   void accept_vis (ASTVisitor &vis) override;
 
   // Invalid if path is empty, so base stripping on that.
@@ -668,17 +662,12 @@ public:
     outer_attrs = std::move (new_attrs);
   }
 
-  NodeId get_pattern_node_id () const override final
-  {
-    return ExprWithoutBlock::get_node_id ();
-  }
-
   AST::Kind get_ast_kind () const override
   {
     return AST::Kind::MACRO_INVOCATION;
   }
 
-  NodeId get_macro_node_id () const { return node_id; }
+  NodeId get_macro_node_id () const { return macro_node_id; }
 
   MacroInvocData &get_invoc_data () { return invoc_data; }
 
@@ -715,16 +704,14 @@ private:
     MacroInvocData invoc_data, std::vector<Attribute> outer_attrs,
     location_t locus, bool is_semi_coloned,
     std::vector<std::unique_ptr<MacroInvocation>> &&pending_eager_invocs)
-    : TraitItem (locus), outer_attrs (std::move (outer_attrs)), locus (locus),
-      node_id (Analysis::Mappings::get ()->get_next_node_id ()),
+    : LocatedImpl (locus), outer_attrs (std::move (outer_attrs)), macro_node_id (Analysis::Mappings::get ()->get_next_node_id ()),
       invoc_data (std::move (invoc_data)), is_semi_coloned (is_semi_coloned),
       kind (kind), builtin_kind (builtin_kind),
       pending_eager_invocs (std::move (pending_eager_invocs))
   {}
 
   MacroInvocation (const MacroInvocation &other)
-    : TraitItem (other.locus), outer_attrs (other.outer_attrs),
-      locus (other.locus), node_id (other.node_id),
+    : NodeIdStore (other), LocatedImpl (other), outer_attrs (other.outer_attrs), macro_node_id (other.macro_node_id),
       invoc_data (other.invoc_data), is_semi_coloned (other.is_semi_coloned),
       kind (other.kind), builtin_kind (other.builtin_kind)
   {
@@ -735,8 +722,7 @@ private:
   }
 
   std::vector<Attribute> outer_attrs;
-  location_t locus;
-  NodeId node_id;
+  NodeId macro_node_id;
 
   /* The data given to the macro invocation */
   MacroInvocData invoc_data;
@@ -803,20 +789,10 @@ protected:
 
   bool is_item () const override { return !has_semicolon (); }
 
-  TraitItem *clone_trait_item_impl () const override
+  AssociatedItem *clone_associated_item_impl () const override
   {
     return clone_macro_invocation_impl ();
   };
-
-  TraitImplItem *clone_trait_impl_item_impl () const override
-  {
-    return clone_macro_invocation_impl ();
-  };
-
-  InherentImplItem *clone_inherent_impl_item_impl () const override
-  {
-    return clone_macro_invocation_impl ();
-  }
 };
 
 // more generic meta item path-only form

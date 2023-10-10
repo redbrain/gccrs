@@ -4899,12 +4899,12 @@ Parser<ManagedTokenSource>::parse_trait (AST::Visibility vis,
   AST::AttrVec inner_attrs = parse_inner_attributes ();
 
   // parse trait items
-  std::vector<std::unique_ptr<AST::TraitItem>> trait_items;
+  std::vector<std::unique_ptr<AST::AssociatedItem>> trait_items;
 
   const_TokenPtr t = lexer.peek_token ();
   while (t->get_id () != RIGHT_CURLY)
     {
-      std::unique_ptr<AST::TraitItem> trait_item = parse_trait_item ();
+      std::unique_ptr<AST::AssociatedItem> trait_item = parse_trait_item ();
 
       if (trait_item == nullptr)
 	{
@@ -4948,7 +4948,7 @@ Parser<ManagedTokenSource>::parse_trait (AST::Visibility vis,
 
 // Parses a trait item used inside traits (not trait, the Item).
 template <typename ManagedTokenSource>
-std::unique_ptr<AST::TraitItem>
+std::unique_ptr<AST::AssociatedItem>
 Parser<ManagedTokenSource>::parse_trait_item ()
 {
   // parse outer attributes (if they exist)
@@ -5093,7 +5093,7 @@ Parser<ManagedTokenSource>::parse_trait_item ()
       }
       default: {
 	// TODO: try and parse macro invocation semi - if fails, maybe error.
-	std::unique_ptr<AST::TraitItem> macro_invoc
+	std::unique_ptr<AST::AssociatedItem> macro_invoc
 	  = parse_macro_invocation_semi (outer_attrs);
 
 	if (macro_invoc == nullptr)
@@ -5272,13 +5272,13 @@ Parser<ManagedTokenSource>::parse_impl (AST::Visibility vis,
       // parse inner attributes (optional)
       AST::AttrVec inner_attrs = parse_inner_attributes ();
 
-      // parse inherent impl items
-      std::vector<std::unique_ptr<AST::InherentImplItem>> impl_items;
+      // parse associated items
+      std::vector<std::unique_ptr<AST::AssociatedItem>> impl_items;
 
       const_TokenPtr t = lexer.peek_token ();
       while (t->get_id () != RIGHT_CURLY)
 	{
-	  std::unique_ptr<AST::InherentImplItem> impl_item
+	  std::unique_ptr<AST::AssociatedItem> impl_item
 	    = parse_inherent_impl_item ();
 
 	  if (impl_item == nullptr)
@@ -5348,12 +5348,12 @@ Parser<ManagedTokenSource>::parse_impl (AST::Visibility vis,
       AST::AttrVec inner_attrs = parse_inner_attributes ();
 
       // parse trait impl items
-      std::vector<std::unique_ptr<AST::TraitImplItem>> impl_items;
+      std::vector<std::unique_ptr<AST::AssociatedItem>> impl_items;
 
       const_TokenPtr t = lexer.peek_token ();
       while (t->get_id () != RIGHT_CURLY)
 	{
-	  std::unique_ptr<AST::TraitImplItem> impl_item
+	  std::unique_ptr<AST::AssociatedItem> impl_item
 	    = parse_trait_impl_item ();
 
 	  if (impl_item == nullptr)
@@ -5397,7 +5397,7 @@ Parser<ManagedTokenSource>::parse_impl (AST::Visibility vis,
 
 // Parses a single inherent impl item (item inside an inherent impl block).
 template <typename ManagedTokenSource>
-std::unique_ptr<AST::InherentImplItem>
+std::unique_ptr<AST::AssociatedItem>
 Parser<ManagedTokenSource>::parse_inherent_impl_item ()
 {
   // parse outer attributes (if they exist)
@@ -5514,7 +5514,7 @@ Parser<ManagedTokenSource>::parse_inherent_impl_item ()
 // InherentImplItem is this specialisation of the template while TraitImplItem
 // will be the other.
 template <typename ManagedTokenSource>
-std::unique_ptr<AST::InherentImplItem>
+std::unique_ptr<AST::AssociatedItem>
 Parser<ManagedTokenSource>::parse_inherent_impl_function_or_method (
   AST::Visibility vis, AST::AttrVec outer_attrs)
 {
@@ -5621,7 +5621,7 @@ Parser<ManagedTokenSource>::parse_inherent_impl_function_or_method (
 
 // Parses a single trait impl item (item inside a trait impl block).
 template <typename ManagedTokenSource>
-std::unique_ptr<AST::TraitImplItem>
+std::unique_ptr<AST::AssociatedItem>
 Parser<ManagedTokenSource>::parse_trait_impl_item ()
 {
   // parse outer attributes (if they exist)
@@ -5696,7 +5696,7 @@ Parser<ManagedTokenSource>::parse_trait_impl_item ()
  * smaller ones and prevents duplication of logic. Strictly, this parses a
  * function or method item inside a trait impl item block. */
 template <typename ManagedTokenSource>
-std::unique_ptr<AST::TraitImplItem>
+std::unique_ptr<AST::AssociatedItem>
 Parser<ManagedTokenSource>::parse_trait_impl_function_or_method (
   AST::Visibility vis, AST::AttrVec outer_attrs)
 {

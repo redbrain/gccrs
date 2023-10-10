@@ -51,9 +51,7 @@ class Lifetime;
 class GenericParam;
 class LifetimeParam;
 class ConstGenericParam;
-class TraitItem;
-class InherentImplItem;
-class TraitImplItem;
+class AssociatedItem;
 struct Crate;
 class PathExpr;
 
