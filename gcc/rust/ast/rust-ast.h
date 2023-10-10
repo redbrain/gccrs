@@ -85,13 +85,13 @@ public:
   virtual location_t get_locus () const = 0;
 };
 
-class LocatedImpl: virtual public Located
+class LocatedImpl : virtual public Located
 {
 private:
   location_t locus;
 
 protected:
-  LocatedImpl (location_t locus): locus (locus) {}
+  LocatedImpl (location_t locus) : locus (locus) {}
 
 public:
   location_t get_locus () const override final { return locus; }
@@ -1181,7 +1181,9 @@ protected:
 };
 
 // Pattern base AST node
-class Pattern : public Visitable, virtual public Located, virtual public NodeIdStore
+class Pattern : public Visitable,
+		virtual public Located,
+		virtual public NodeIdStore
 {
 public:
   // Unique pointer custom clone function

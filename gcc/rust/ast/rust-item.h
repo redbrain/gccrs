@@ -1034,9 +1034,10 @@ public:
   Module (Identifier module_name, Visibility visibility,
 	  std::vector<Attribute> outer_attrs, location_t locus,
 	  std::string outer_filename, std::vector<std::string> module_scope)
-    : VisItem (std::move (visibility), std::move (outer_attrs)), LocatedImpl (locus),
-      module_name (module_name), kind (ModuleKind::UNLOADED),
-      outer_filename (outer_filename), inner_attrs (std::vector<Attribute> ()),
+    : VisItem (std::move (visibility), std::move (outer_attrs)),
+      LocatedImpl (locus), module_name (module_name),
+      kind (ModuleKind::UNLOADED), outer_filename (outer_filename),
+      inner_attrs (std::vector<Attribute> ()),
       items (std::vector<std::unique_ptr<Item>> ()),
       module_scope (std::move (module_scope))
   {}
@@ -1047,8 +1048,8 @@ public:
 	  Visibility visibility = Visibility::create_error (),
 	  std::vector<Attribute> inner_attrs = std::vector<Attribute> (),
 	  std::vector<Attribute> outer_attrs = std::vector<Attribute> ())
-    : VisItem (std::move (visibility), std::move (outer_attrs)), LocatedImpl (locus),
-      module_name (name), kind (ModuleKind::LOADED),
+    : VisItem (std::move (visibility), std::move (outer_attrs)),
+      LocatedImpl (locus), module_name (name), kind (ModuleKind::LOADED),
       outer_filename (std::string ()), inner_attrs (std::move (inner_attrs)),
       items (std::move (items))
   {}
@@ -1700,7 +1701,9 @@ protected:
 };
 
 // Rust type alias (i.e. typedef) AST node
-class TypeAlias : public VisItem, public AssociatedItem, virtual public LocatedImpl
+class TypeAlias : public VisItem,
+		  public AssociatedItem,
+		  virtual public LocatedImpl
 {
   Identifier new_type_name;
 
@@ -2572,8 +2575,7 @@ protected:
 
 /* "Constant item" AST node - used for constant, compile-time expressions
  * within module scope (like constexpr) */
-class ConstantItem : public VisItem,
-		     public AssociatedItem
+class ConstantItem : public VisItem, public AssociatedItem
 {
   // either has an identifier or "_" - maybe handle in identifier?
   // bool identifier_is_underscore;
@@ -2910,7 +2912,9 @@ public:
 };
 
 // Actual trait item function declaration within traits
-class TraitItemFunc : public AssociatedItem, public LocatedImpl, public NodeIdStore
+class TraitItemFunc : public AssociatedItem,
+		      public LocatedImpl,
+		      public NodeIdStore
 {
   std::vector<Attribute> outer_attrs;
   TraitFunctionDecl decl;
@@ -3123,7 +3127,9 @@ public:
 };
 
 // Actual trait item method declaration within traits
-class TraitItemMethod : public AssociatedItem, public LocatedImpl, public NodeIdStore
+class TraitItemMethod : public AssociatedItem,
+			public LocatedImpl,
+			public NodeIdStore
 {
   std::vector<Attribute> outer_attrs;
   TraitMethodDecl decl;
@@ -3204,7 +3210,9 @@ protected:
 };
 
 // Constant item within traits
-class TraitItemConst : public AssociatedItem, public LocatedImpl, public NodeIdStore
+class TraitItemConst : public AssociatedItem,
+		       public LocatedImpl,
+		       public NodeIdStore
 {
   std::vector<Attribute> outer_attrs;
   Identifier name;
@@ -3304,7 +3312,9 @@ protected:
 };
 
 // Type items within traits
-class TraitItemType : public AssociatedItem, public LocatedImpl, public NodeIdStore
+class TraitItemType : public AssociatedItem,
+		      public LocatedImpl,
+		      public NodeIdStore
 {
   std::vector<Attribute> outer_attrs;
 
@@ -3429,9 +3439,9 @@ public:
 	 std::vector<std::unique_ptr<GenericParam>> generic_params,
 	 std::vector<std::unique_ptr<TypeParamBound>> type_param_bounds,
 	 WhereClause where_clause,
-	 std::vector<std::unique_ptr<AssociatedItem>> trait_items, Visibility vis,
-	 std::vector<Attribute> outer_attrs, std::vector<Attribute> inner_attrs,
-	 location_t locus)
+	 std::vector<std::unique_ptr<AssociatedItem>> trait_items,
+	 Visibility vis, std::vector<Attribute> outer_attrs,
+	 std::vector<Attribute> inner_attrs, location_t locus)
     : VisItem (std::move (vis), std::move (outer_attrs)),
       has_unsafe (is_unsafe), has_auto (is_auto), name (std::move (name)),
       generic_params (std::move (generic_params)),
@@ -3920,9 +3930,9 @@ public:
   {}
 
   ExternalTypeItem (ExternalTypeItem const &other)
-    : ExternalItem (other), outer_attrs (other.outer_attrs), visibility (other.visibility),
-      item_name (other.item_name), locus (other.locus),
-      marked_for_strip (other.marked_for_strip)
+    : ExternalItem (other), outer_attrs (other.outer_attrs),
+      visibility (other.visibility), item_name (other.item_name),
+      locus (other.locus), marked_for_strip (other.marked_for_strip)
   {}
 
   ExternalTypeItem &operator= (ExternalTypeItem const &other)
@@ -3993,15 +4003,16 @@ public:
   ExternalStaticItem (Identifier item_name, std::unique_ptr<Type> item_type,
 		      bool is_mut, Visibility vis,
 		      std::vector<Attribute> outer_attrs, location_t locus)
-    : outer_attrs (std::move (outer_attrs)),
-      visibility (std::move (vis)), item_name (std::move (item_name)),
-      locus (locus), has_mut (is_mut), item_type (std::move (item_type))
+    : outer_attrs (std::move (outer_attrs)), visibility (std::move (vis)),
+      item_name (std::move (item_name)), locus (locus), has_mut (is_mut),
+      item_type (std::move (item_type))
   {}
 
   // Copy constructor
   ExternalStaticItem (ExternalStaticItem const &other)
-    : ExternalItem (other), outer_attrs (other.outer_attrs), visibility (other.visibility),
-      item_name (other.item_name), locus (other.locus), has_mut (other.has_mut)
+    : ExternalItem (other), outer_attrs (other.outer_attrs),
+      visibility (other.visibility), item_name (other.item_name),
+      locus (other.locus), has_mut (other.has_mut)
   {
     // guard to prevent null dereference (only required if error state)
     if (other.item_type != nullptr)
@@ -4237,9 +4248,9 @@ public:
     std::vector<NamedFunctionParam> function_params, bool has_variadics,
     std::vector<Attribute> variadic_outer_attrs, Visibility vis,
     std::vector<Attribute> outer_attrs, location_t locus)
-    : outer_attrs (std::move (outer_attrs)),
-      visibility (std::move (vis)), item_name (std::move (item_name)),
-      locus (locus), generic_params (std::move (generic_params)),
+    : outer_attrs (std::move (outer_attrs)), visibility (std::move (vis)),
+      item_name (std::move (item_name)), locus (locus),
+      generic_params (std::move (generic_params)),
       return_type (std::move (return_type)),
       where_clause (std::move (where_clause)),
       function_params (std::move (function_params)),
@@ -4252,9 +4263,9 @@ public:
 
   // Copy constructor with clone
   ExternalFunctionItem (ExternalFunctionItem const &other)
-    : ExternalItem (other), outer_attrs (other.outer_attrs), visibility (other.visibility),
-      item_name (other.item_name), locus (other.locus),
-      where_clause (other.where_clause),
+    : ExternalItem (other), outer_attrs (other.outer_attrs),
+      visibility (other.visibility), item_name (other.item_name),
+      locus (other.locus), where_clause (other.where_clause),
       function_params (other.function_params),
       has_variadics (other.has_variadics),
       variadic_outer_attrs (other.variadic_outer_attrs)

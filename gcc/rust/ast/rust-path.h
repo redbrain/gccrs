@@ -575,7 +575,9 @@ public:
 
 /* AST node representing a path-in-expression pattern (path that allows
  * generic arguments) */
-class PathInExpression : public PathPattern, public PathExpr, virtual public NodeIdStore
+class PathInExpression : public PathPattern,
+			 public PathExpr,
+			 virtual public NodeIdStore
 {
   std::vector<Attribute> outer_attrs;
   bool has_opening_scope_resolution;
@@ -590,8 +592,7 @@ public:
 		    bool has_opening_scope_resolution = false)
     : PathPattern (std::move (path_segments)),
       outer_attrs (std::move (outer_attrs)),
-      has_opening_scope_resolution (has_opening_scope_resolution),
-      locus (locus)
+      has_opening_scope_resolution (has_opening_scope_resolution), locus (locus)
   {}
 
   // Creates an error state path in expression.
@@ -1034,7 +1035,8 @@ public:
 
   // Copy constructor with vector clone
   TypePath (TypePath const &other)
-    : TypeNoBounds (other), has_opening_scope_resolution (other.has_opening_scope_resolution),
+    : TypeNoBounds (other),
+      has_opening_scope_resolution (other.has_opening_scope_resolution),
       locus (other.locus)
   {
     segments.reserve (other.segments.size ());

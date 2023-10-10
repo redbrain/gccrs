@@ -505,11 +505,12 @@ private:
   MacroRulesDefinition (Identifier builtin_name, DelimType delim_type,
 			MacroTranscriberFunc associated_transcriber,
 			MacroKind kind, Visibility vis)
-    : VisItem (std::move (vis), std::vector<Attribute> ()), LocatedImpl (UNDEF_LOCATION),
-      outer_attrs (std::vector<Attribute> ()), rule_name (builtin_name),
-      delim_type (delim_type), rules (std::vector<MacroRule> ()),
-      associated_transcriber (associated_transcriber),
-      is_builtin_rule (true), kind (kind)
+    : VisItem (std::move (vis), std::vector<Attribute> ()),
+      LocatedImpl (UNDEF_LOCATION), outer_attrs (std::vector<Attribute> ()),
+      rule_name (builtin_name), delim_type (delim_type),
+      rules (std::vector<MacroRule> ()),
+      associated_transcriber (associated_transcriber), is_builtin_rule (true),
+      kind (kind)
   {}
 
 public:
@@ -704,16 +705,18 @@ private:
     MacroInvocData invoc_data, std::vector<Attribute> outer_attrs,
     location_t locus, bool is_semi_coloned,
     std::vector<std::unique_ptr<MacroInvocation>> &&pending_eager_invocs)
-    : LocatedImpl (locus), outer_attrs (std::move (outer_attrs)), macro_node_id (Analysis::Mappings::get ()->get_next_node_id ()),
+    : LocatedImpl (locus), outer_attrs (std::move (outer_attrs)),
+      macro_node_id (Analysis::Mappings::get ()->get_next_node_id ()),
       invoc_data (std::move (invoc_data)), is_semi_coloned (is_semi_coloned),
       kind (kind), builtin_kind (builtin_kind),
       pending_eager_invocs (std::move (pending_eager_invocs))
   {}
 
   MacroInvocation (const MacroInvocation &other)
-    : NodeIdStore (other), LocatedImpl (other), outer_attrs (other.outer_attrs), macro_node_id (other.macro_node_id),
-      invoc_data (other.invoc_data), is_semi_coloned (other.is_semi_coloned),
-      kind (other.kind), builtin_kind (other.builtin_kind)
+    : NodeIdStore (other), LocatedImpl (other), outer_attrs (other.outer_attrs),
+      macro_node_id (other.macro_node_id), invoc_data (other.invoc_data),
+      is_semi_coloned (other.is_semi_coloned), kind (other.kind),
+      builtin_kind (other.builtin_kind)
   {
     if (other.kind == InvocKind::Builtin)
       for (auto &pending : other.pending_eager_invocs)
