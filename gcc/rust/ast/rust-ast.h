@@ -79,6 +79,36 @@ enum class Kind
   IDENTIFIER,
 };
 
+class Located
+{
+public:
+  virtual location_t get_locus () const = 0;
+};
+
+class LocatedImpl : virtual public Located
+{
+private:
+  location_t locus;
+
+protected:
+  LocatedImpl (location_t locus) : locus (locus) {}
+
+public:
+  location_t get_locus () const override final { return locus; }
+};
+
+class NodeIdStore
+{
+  NodeId node_id;
+
+public:
+  NodeIdStore () : node_id (Analysis::Mappings::get ()->get_next_node_id ()) {}
+
+  NodeId get_node_id () const { return node_id; }
+
+  friend class Expr;
+};
+
 class Visitable
 {
 public:
@@ -362,18 +392,16 @@ public:
 };
 
 // A segment of a simple path without generic or type arguments
-class SimplePathSegment : public PathSegment
+class SimplePathSegment : public PathSegment, virtual public NodeIdStore
 {
   std::string segment_name;
   location_t locus;
-  NodeId node_id;
 
   // only allow identifiers, "super", "self", "crate", or "$crate"
 public:
   // TODO: put checks in constructor to enforce this rule?
   SimplePathSegment (std::string segment_name, location_t locus)
-    : segment_name (std::move (segment_name)), locus (locus),
-      node_id (Analysis::Mappings::get ()->get_next_node_id ())
+    : segment_name (std::move (segment_name)), locus (locus)
   {}
 
   /* Returns whether simple path segment is in an invalid state (currently, if
@@ -389,7 +417,6 @@ public:
   std::string as_string () const override;
 
   location_t get_locus () const { return locus; }
-  NodeId get_node_id () const { return node_id; }
   const std::string &get_segment_name () const { return segment_name; }
   bool is_super_path_seg () const
   {
@@ -404,12 +431,11 @@ public:
 };
 
 // A simple path without generic or type arguments
-class SimplePath
+class SimplePath : public NodeIdStore
 {
   bool opening_scope_resolution;
   std::vector<SimplePathSegment> segments;
   location_t locus;
-  NodeId node_id;
 
 public:
   // Constructor
@@ -417,15 +443,13 @@ public:
 	      bool has_opening_scope_resolution = false,
 	      location_t locus = UNDEF_LOCATION)
     : opening_scope_resolution (has_opening_scope_resolution),
-      segments (std::move (path_segments)), locus (locus),
-      node_id (Analysis::Mappings::get ()->get_next_node_id ())
+      segments (std::move (path_segments)), locus (locus)
   {}
 
   SimplePath (Identifier ident)
     : opening_scope_resolution (false),
       segments ({SimplePathSegment (ident.as_string (), ident.get_locus ())}),
-      locus (ident.get_locus ()),
-      node_id (Analysis::Mappings::get ()->get_next_node_id ())
+      locus (ident.get_locus ())
   {}
 
   // Creates an empty SimplePath.
@@ -445,7 +469,6 @@ public:
   }
 
   location_t get_locus () const { return locus; }
-  NodeId get_node_id () const { return node_id; }
 
   // does this need visitor if not polymorphic? probably not
 
@@ -955,7 +978,7 @@ class MetaListNameValueStr;
 /* Base statement abstract class. Note that most "statements" are not allowed
  * in top-level module scope - only a subclass of statements called "items"
  * are. */
-class Stmt : public Node
+class Stmt : public Node, virtual public Located, virtual public NodeIdStore
 {
 public:
   enum class Kind
@@ -977,11 +1000,8 @@ public:
 
   virtual std::string as_string () const = 0;
 
-  virtual location_t get_locus () const = 0;
-
   virtual void mark_for_strip () = 0;
   virtual bool is_marked_for_strip () const = 0;
-  NodeId get_node_id () const { return node_id; }
 
   virtual Kind get_stmt_kind () = 0;
 
@@ -992,12 +1012,8 @@ public:
   virtual void add_semicolon () {}
 
 protected:
-  Stmt () : node_id (Analysis::Mappings::get ()->get_next_node_id ()) {}
-
   // Clone function implementation as pure virtual method
   virtual Stmt *clone_stmt_impl () const = 0;
-
-  NodeId node_id;
 };
 
 // Rust "item" AST node (declaration of top-level/module-level allowed stuff)
@@ -1041,7 +1057,7 @@ protected:
 class ExprWithoutBlock;
 
 // Base expression AST node - abstract
-class Expr : public Node
+class Expr : public Node, virtual public Located, virtual public NodeIdStore
 {
 public:
   // Unique pointer custom clone function
@@ -1059,8 +1075,6 @@ public:
 
   virtual ~Expr () {}
 
-  virtual location_t get_locus () const = 0;
-
   virtual bool is_literal () const { return false; }
 
   // HACK: strictly not needed, but faster than full downcast clone
@@ -1068,8 +1082,6 @@ public:
 
   virtual void mark_for_strip () = 0;
   virtual bool is_marked_for_strip () const = 0;
-
-  virtual NodeId get_node_id () const { return node_id; }
 
   virtual void set_node_id (NodeId id) { node_id = id; }
 
@@ -1080,13 +1092,8 @@ public:
   virtual void set_outer_attrs (std::vector<Attribute>) = 0;
 
 protected:
-  // Constructor
-  Expr () : node_id (Analysis::Mappings::get ()->get_next_node_id ()) {}
-
   // Clone function implementation as pure virtual method
   virtual Expr *clone_expr_impl () const = 0;
-
-  NodeId node_id;
 };
 
 // AST node for an expression without an accompanying block - abstract
@@ -1174,7 +1181,9 @@ protected:
 };
 
 // Pattern base AST node
-class Pattern : public Visitable
+class Pattern : public Visitable,
+		virtual public Located,
+		virtual public NodeIdStore
 {
 public:
   // Unique pointer custom clone function
@@ -1193,9 +1202,6 @@ public:
   virtual void mark_for_strip () {}
   virtual bool is_marked_for_strip () const { return false; }
 
-  virtual location_t get_locus () const = 0;
-  virtual NodeId get_pattern_node_id () const = 0;
-
 protected:
   // Clone pattern implementation as pure virtual method
   virtual Pattern *clone_pattern_impl () const = 0;
@@ -1205,7 +1211,7 @@ protected:
 class TraitBound;
 
 // Base class for types as represented in AST - abstract
-class Type : public Node
+class Type : public Node, virtual public Located, virtual public NodeIdStore
 {
 public:
   // Unique pointer custom clone function
@@ -1229,17 +1235,9 @@ public:
   virtual void mark_for_strip () {}
   virtual bool is_marked_for_strip () const { return false; }
 
-  virtual location_t get_locus () const = 0;
-
-  NodeId get_node_id () const { return node_id; }
-
 protected:
-  Type () : node_id (Analysis::Mappings::get ()->get_next_node_id ()) {}
-
   // Clone function implementation as pure virtual method
   virtual Type *clone_type_impl () const = 0;
-
-  NodeId node_id;
 };
 
 // A type without parentheses? - abstract
@@ -1446,76 +1444,20 @@ protected:
   }
 };
 
-// Item used in trait declarations - abstract base class
-class TraitItem : public Visitable
-{
-protected:
-  TraitItem (location_t locus)
-    : node_id (Analysis::Mappings::get ()->get_next_node_id ()), locus (locus)
-  {}
-
-  // Clone function implementation as pure virtual method
-  virtual TraitItem *clone_trait_item_impl () const = 0;
-
-  NodeId node_id;
-  location_t locus;
-
-public:
-  virtual ~TraitItem () {}
-
-  // Unique pointer custom clone function
-  std::unique_ptr<TraitItem> clone_trait_item () const
-  {
-    return std::unique_ptr<TraitItem> (clone_trait_item_impl ());
-  }
-
-  virtual std::string as_string () const = 0;
-
-  virtual void mark_for_strip () = 0;
-  virtual bool is_marked_for_strip () const = 0;
-
-  NodeId get_node_id () const { return node_id; }
-  location_t get_locus () const { return locus; }
-};
-
-/* Abstract base class for items used within an inherent impl block (the impl
- * name {} one) */
-class InherentImplItem : public Visitable
+// Abstract base class for items used within an impl block
+class AssociatedItem : public Visitable, virtual public Located
 {
 protected:
   // Clone function implementation as pure virtual method
-  virtual InherentImplItem *clone_inherent_impl_item_impl () const = 0;
+  virtual AssociatedItem *clone_associated_item_impl () const = 0;
 
 public:
-  virtual ~InherentImplItem () {}
+  virtual ~AssociatedItem () {}
 
   // Unique pointer custom clone function
-  std::unique_ptr<InherentImplItem> clone_inherent_impl_item () const
+  std::unique_ptr<AssociatedItem> clone_associated_item () const
   {
-    return std::unique_ptr<InherentImplItem> (clone_inherent_impl_item_impl ());
-  }
-
-  virtual std::string as_string () const = 0;
-
-  virtual void mark_for_strip () = 0;
-  virtual bool is_marked_for_strip () const = 0;
-
-  virtual location_t get_locus () const = 0;
-};
-
-// Abstract base class for items used in a trait impl
-class TraitImplItem : public Visitable
-{
-protected:
-  virtual TraitImplItem *clone_trait_impl_item_impl () const = 0;
-
-public:
-  virtual ~TraitImplItem (){};
-
-  // Unique pointer custom clone function
-  std::unique_ptr<TraitImplItem> clone_trait_impl_item () const
-  {
-    return std::unique_ptr<TraitImplItem> (clone_trait_impl_item_impl ());
+    return std::unique_ptr<AssociatedItem> (clone_associated_item_impl ());
   }
 
   virtual std::string as_string () const = 0;
@@ -1525,11 +1467,9 @@ public:
 };
 
 // Abstract base class for an item used inside an extern block
-class ExternalItem : public Visitable
+class ExternalItem : public Visitable, virtual public NodeIdStore
 {
 public:
-  ExternalItem () : node_id (Analysis::Mappings::get ()->get_next_node_id ()) {}
-
   virtual ~ExternalItem () {}
 
   // Unique pointer custom clone function
@@ -1543,13 +1483,9 @@ public:
   virtual void mark_for_strip () = 0;
   virtual bool is_marked_for_strip () const = 0;
 
-  NodeId get_node_id () const { return node_id; }
-
 protected:
   // Clone function implementation as pure virtual method
   virtual ExternalItem *clone_external_item_impl () const = 0;
-
-  NodeId node_id;
 };
 
 /* Data structure to store the data used in macro invocations and macro
@@ -1652,9 +1588,7 @@ public:
     ITEM,
     STMT,
     EXTERN,
-    TRAIT,
-    IMPL,
-    TRAIT_IMPL,
+    ASSOC_ITEM,
     TYPE,
   };
 
@@ -1666,9 +1600,7 @@ private:
   std::unique_ptr<Item> item;
   std::unique_ptr<Stmt> stmt;
   std::unique_ptr<ExternalItem> external_item;
-  std::unique_ptr<TraitItem> trait_item;
-  std::unique_ptr<InherentImplItem> impl_item;
-  std::unique_ptr<TraitImplItem> trait_impl_item;
+  std::unique_ptr<AssociatedItem> assoc_item;
   std::unique_ptr<Type> type;
 
 public:
@@ -1688,16 +1620,8 @@ public:
     : kind (EXTERN), external_item (std::move (item))
   {}
 
-  SingleASTNode (std::unique_ptr<TraitItem> item)
-    : kind (TRAIT), trait_item (std::move (item))
-  {}
-
-  SingleASTNode (std::unique_ptr<InherentImplItem> item)
-    : kind (IMPL), impl_item (std::move (item))
-  {}
-
-  SingleASTNode (std::unique_ptr<TraitImplItem> trait_impl_item)
-    : kind (TRAIT_IMPL), trait_impl_item (std::move (trait_impl_item))
+  SingleASTNode (std::unique_ptr<AssociatedItem> item)
+    : kind (ASSOC_ITEM), assoc_item (std::move (item))
   {}
 
   SingleASTNode (std::unique_ptr<Type> type)
@@ -1725,16 +1649,8 @@ public:
 	external_item = other.external_item->clone_external_item ();
 	break;
 
-      case TRAIT:
-	trait_item = other.trait_item->clone_trait_item ();
-	break;
-
-      case IMPL:
-	impl_item = other.impl_item->clone_inherent_impl_item ();
-	break;
-
-      case TRAIT_IMPL:
-	trait_impl_item = other.trait_impl_item->clone_trait_impl_item ();
+      case ASSOC_ITEM:
+	assoc_item = other.assoc_item->clone_associated_item ();
 	break;
 
       case TYPE:
@@ -1764,16 +1680,8 @@ public:
 	external_item = other.external_item->clone_external_item ();
 	break;
 
-      case TRAIT:
-	trait_item = other.trait_item->clone_trait_item ();
-	break;
-
-      case IMPL:
-	impl_item = other.impl_item->clone_inherent_impl_item ();
-	break;
-
-      case TRAIT_IMPL:
-	trait_impl_item = other.trait_impl_item->clone_trait_impl_item ();
+      case ASSOC_ITEM:
+	assoc_item = other.assoc_item->clone_associated_item ();
 	break;
 
       case TYPE:
@@ -1829,28 +1737,16 @@ public:
     return std::move (item);
   }
 
-  std::unique_ptr<TraitItem> take_trait_item ()
-  {
-    rust_assert (!is_error ());
-    return std::move (trait_item);
-  }
-
   std::unique_ptr<ExternalItem> take_external_item ()
   {
     rust_assert (!is_error ());
     return std::move (external_item);
   }
 
-  std::unique_ptr<InherentImplItem> take_impl_item ()
+  std::unique_ptr<AssociatedItem> take_assoc_item ()
   {
     rust_assert (!is_error ());
-    return std::move (impl_item);
-  }
-
-  std::unique_ptr<TraitImplItem> take_trait_impl_item ()
-  {
-    rust_assert (!is_error ());
-    return std::move (trait_impl_item);
+    return std::move (assoc_item);
   }
 
   std::unique_ptr<Type> take_type ()
@@ -1879,16 +1775,8 @@ public:
 	external_item->accept_vis (vis);
 	break;
 
-      case TRAIT:
-	trait_item->accept_vis (vis);
-	break;
-
-      case IMPL:
-	impl_item->accept_vis (vis);
-	break;
-
-      case TRAIT_IMPL:
-	trait_impl_item->accept_vis (vis);
+      case ASSOC_ITEM:
+	assoc_item->accept_vis (vis);
 	break;
 
       case TYPE:
@@ -1909,12 +1797,8 @@ public:
 	return stmt == nullptr;
       case EXTERN:
 	return external_item == nullptr;
-      case TRAIT:
-	return trait_item == nullptr;
-      case IMPL:
-	return impl_item == nullptr;
-      case TRAIT_IMPL:
-	return trait_impl_item == nullptr;
+      case ASSOC_ITEM:
+	return assoc_item == nullptr;
       case TYPE:
 	return type == nullptr;
       }
@@ -1935,12 +1819,8 @@ public:
 	return "Stmt: " + stmt->as_string ();
       case EXTERN:
 	return "External Item: " + external_item->as_string ();
-      case TRAIT:
-	return "Trait Item: " + trait_item->as_string ();
-      case IMPL:
-	return "Impl Item: " + impl_item->as_string ();
-      case TRAIT_IMPL:
-	return "Trait Impl Item: " + trait_impl_item->as_string ();
+      case ASSOC_ITEM:
+	return "Associated Item: " + assoc_item->as_string ();
       case TYPE:
 	return "Type: " + type->as_string ();
       }

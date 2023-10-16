@@ -91,7 +91,7 @@ public:
 
   // Copy constructor uses clone
   TypeParam (TypeParam const &other)
-    : GenericParam (other.node_id), outer_attr (other.outer_attr),
+    : GenericParam (other), outer_attr (other.outer_attr),
       type_representation (other.type_representation), locus (other.locus)
   {
     // guard to prevent null pointer dereference
@@ -106,10 +106,10 @@ public:
   // Overloaded assignment operator to clone
   TypeParam &operator= (TypeParam const &other)
   {
+    GenericParam::operator= (other);
     type_representation = other.type_representation;
     outer_attr = other.outer_attr;
     locus = other.locus;
-    node_id = other.node_id;
 
     // guard to prevent null pointer dereference
     if (other.type != nullptr)
@@ -726,7 +726,7 @@ protected:
 };
 
 // A method (function belonging to a type)
-class Method : public InherentImplItem, public TraitImplItem
+class Method : public AssociatedItem
 {
   std::vector<Attribute> outer_attrs;
   Visibility vis;
@@ -913,7 +913,7 @@ public:
 
   NodeId get_node_id () const { return node_id; }
 
-  location_t get_locus () const override final { return locus; }
+  location_t get_locus () const { return locus; }
 
   FunctionQualifiers get_qualifiers () { return qualifiers; }
 
@@ -923,14 +923,7 @@ public:
 protected:
   /* Use covariance to implement clone function as returning this object
    * rather than base */
-  Method *clone_inherent_impl_item_impl () const final override
-  {
-    return clone_method_impl ();
-  }
-
-  /* Use covariance to implement clone function as returning this object
-   * rather than base */
-  Method *clone_trait_impl_item_impl () const final override
+  Method *clone_associated_item_impl () const final override
   {
     return clone_method_impl ();
   }
@@ -988,7 +981,7 @@ public:
 };
 
 // Rust module item - abstract base class
-class Module : public VisItem
+class Module : public VisItem, public LocatedImpl
 {
 public:
   // Type of the current module. A module can be either loaded or unloaded,
@@ -1008,7 +1001,6 @@ public:
 
 private:
   Identifier module_name;
-  location_t locus;
   ModuleKind kind;
 
   // Name of the file including the module
@@ -1043,8 +1035,9 @@ public:
 	  std::vector<Attribute> outer_attrs, location_t locus,
 	  std::string outer_filename, std::vector<std::string> module_scope)
     : VisItem (std::move (visibility), std::move (outer_attrs)),
-      module_name (module_name), locus (locus), kind (ModuleKind::UNLOADED),
-      outer_filename (outer_filename), inner_attrs (std::vector<Attribute> ()),
+      LocatedImpl (locus), module_name (module_name),
+      kind (ModuleKind::UNLOADED), outer_filename (outer_filename),
+      inner_attrs (std::vector<Attribute> ()),
       items (std::vector<std::unique_ptr<Item>> ()),
       module_scope (std::move (module_scope))
   {}
@@ -1056,14 +1049,14 @@ public:
 	  std::vector<Attribute> inner_attrs = std::vector<Attribute> (),
 	  std::vector<Attribute> outer_attrs = std::vector<Attribute> ())
     : VisItem (std::move (visibility), std::move (outer_attrs)),
-      module_name (name), locus (locus), kind (ModuleKind::LOADED),
+      LocatedImpl (locus), module_name (name), kind (ModuleKind::LOADED),
       outer_filename (std::string ()), inner_attrs (std::move (inner_attrs)),
       items (std::move (items))
   {}
 
   // Copy constructor with vector clone
   Module (Module const &other)
-    : VisItem (other), module_name (other.module_name), locus (other.locus),
+    : VisItem (other), LocatedImpl (other), module_name (other.module_name),
       kind (other.kind), inner_attrs (other.inner_attrs),
       module_scope (other.module_scope)
   {
@@ -1079,9 +1072,9 @@ public:
   Module &operator= (Module const &other)
   {
     VisItem::operator= (other);
+    LocatedImpl::operator= (other);
 
     module_name = other.module_name;
-    locus = other.locus;
     kind = other.kind;
     inner_attrs = other.inner_attrs;
     module_scope = other.module_scope;
@@ -1133,8 +1126,6 @@ public:
   Module &operator= (Module &&other) = default;
 
   std::string as_string () const override;
-
-  location_t get_locus () const override final { return locus; }
 
   // Invalid if name is empty, so base stripping on that.
   void mark_for_strip () override { module_name = {""}; }
@@ -1544,7 +1535,7 @@ protected:
 class LetStmt;
 
 // Rust function declaration AST node
-class Function : public VisItem, public InherentImplItem, public TraitImplItem
+class Function : public VisItem, public AssociatedItem
 {
   FunctionQualifiers qualifiers;
   Identifier function_name;
@@ -1703,21 +1694,16 @@ protected:
 
   /* Use covariance to implement clone function as returning this object
    * rather than base */
-  Function *clone_inherent_impl_item_impl () const override
-  {
-    return new Function (*this);
-  }
-
-  /* Use covariance to implement clone function as returning this object
-   * rather than base */
-  Function *clone_trait_impl_item_impl () const override
+  Function *clone_associated_item_impl () const override
   {
     return new Function (*this);
   }
 };
 
 // Rust type alias (i.e. typedef) AST node
-class TypeAlias : public VisItem, public TraitImplItem
+class TypeAlias : public VisItem,
+		  public AssociatedItem,
+		  virtual public LocatedImpl
 {
   Identifier new_type_name;
 
@@ -1729,8 +1715,6 @@ class TypeAlias : public VisItem, public TraitImplItem
   WhereClause where_clause;
 
   std::unique_ptr<Type> existing_type;
-
-  location_t locus;
 
 public:
   std::string as_string () const override;
@@ -1747,17 +1731,17 @@ public:
 	     WhereClause where_clause, std::unique_ptr<Type> existing_type,
 	     Visibility vis, std::vector<Attribute> outer_attrs,
 	     location_t locus)
-    : VisItem (std::move (vis), std::move (outer_attrs)),
+    : LocatedImpl (locus), VisItem (std::move (vis), std::move (outer_attrs)),
       new_type_name (std::move (new_type_name)),
       generic_params (std::move (generic_params)),
       where_clause (std::move (where_clause)),
-      existing_type (std::move (existing_type)), locus (locus)
+      existing_type (std::move (existing_type))
   {}
 
   // Copy constructor
   TypeAlias (TypeAlias const &other)
-    : VisItem (other), new_type_name (other.new_type_name),
-      where_clause (other.where_clause), locus (other.locus)
+    : LocatedImpl (other), VisItem (other), new_type_name (other.new_type_name),
+      where_clause (other.where_clause)
   {
     // guard to prevent null dereference (only required if error state)
     if (other.existing_type != nullptr)
@@ -1772,11 +1756,11 @@ public:
   TypeAlias &operator= (TypeAlias const &other)
   {
     VisItem::operator= (other);
+    LocatedImpl::operator= (other);
     new_type_name = other.new_type_name;
     where_clause = other.where_clause;
     // visibility = other.visibility->clone_visibility();
     // outer_attrs = other.outer_attrs;
-    locus = other.locus;
 
     // guard to prevent null dereference (only required if error state)
     if (other.existing_type != nullptr)
@@ -1794,8 +1778,6 @@ public:
   // move constructors
   TypeAlias (TypeAlias &&other) = default;
   TypeAlias &operator= (TypeAlias &&other) = default;
-
-  location_t get_locus () const override final { return locus; }
 
   void accept_vis (ASTVisitor &vis) override;
 
@@ -1834,7 +1816,7 @@ protected:
 
   /* Use covariance to implement clone function as returning this object
    * rather than base */
-  TypeAlias *clone_trait_impl_item_impl () const override
+  TypeAlias *clone_associated_item_impl () const override
   {
     return new TypeAlias (*this);
   }
@@ -2593,9 +2575,7 @@ protected:
 
 /* "Constant item" AST node - used for constant, compile-time expressions
  * within module scope (like constexpr) */
-class ConstantItem : public VisItem,
-		     public InherentImplItem,
-		     public TraitImplItem
+class ConstantItem : public VisItem, public AssociatedItem
 {
   // either has an identifier or "_" - maybe handle in identifier?
   // bool identifier_is_underscore;
@@ -2656,7 +2636,7 @@ public:
    * as identifier) constant. */
   bool is_unnamed () const { return identifier == "_"; }
 
-  location_t get_locus () const override final { return locus; }
+  location_t get_locus () const { return locus; }
 
   void accept_vis (ASTVisitor &vis) override;
 
@@ -2699,14 +2679,7 @@ protected:
 
   /* Use covariance to implement clone function as returning this object
    * rather than base */
-  ConstantItem *clone_inherent_impl_item_impl () const override
-  {
-    return new ConstantItem (*this);
-  }
-
-  /* Use covariance to implement clone function as returning this object
-   * rather than base */
-  ConstantItem *clone_trait_impl_item_impl () const override
+  ConstantItem *clone_associated_item_impl () const override
   {
     return new ConstantItem (*this);
   }
@@ -2939,7 +2912,9 @@ public:
 };
 
 // Actual trait item function declaration within traits
-class TraitItemFunc : public TraitItem
+class TraitItemFunc : public AssociatedItem,
+		      public LocatedImpl,
+		      public NodeIdStore
 {
   std::vector<Attribute> outer_attrs;
   TraitFunctionDecl decl;
@@ -2951,17 +2926,15 @@ public:
 
   TraitItemFunc (TraitFunctionDecl decl, std::unique_ptr<BlockExpr> block_expr,
 		 std::vector<Attribute> outer_attrs, location_t locus)
-    : TraitItem (locus), outer_attrs (std::move (outer_attrs)),
+    : LocatedImpl (locus), outer_attrs (std::move (outer_attrs)),
       decl (std::move (decl)), block_expr (std::move (block_expr))
   {}
 
   // Copy constructor with clone
   TraitItemFunc (TraitItemFunc const &other)
-    : TraitItem (other.locus), outer_attrs (other.outer_attrs),
+    : LocatedImpl (other), NodeIdStore (other), outer_attrs (other.outer_attrs),
       decl (other.decl)
   {
-    node_id = other.node_id;
-
     // guard to prevent null dereference
     if (other.block_expr != nullptr)
       block_expr = other.block_expr->clone_block_expr ();
@@ -2970,11 +2943,10 @@ public:
   // Overloaded assignment operator to clone
   TraitItemFunc &operator= (TraitItemFunc const &other)
   {
-    TraitItem::operator= (other);
+    LocatedImpl::operator= (other);
+    NodeIdStore::operator= (other);
     outer_attrs = other.outer_attrs;
     decl = other.decl;
-    locus = other.locus;
-    node_id = other.node_id;
 
     // guard to prevent null dereference
     if (other.block_expr != nullptr)
@@ -3016,7 +2988,7 @@ public:
 
 protected:
   // Clone function implementation as (not pure) virtual method
-  TraitItemFunc *clone_trait_item_impl () const override
+  TraitItemFunc *clone_associated_item_impl () const override
   {
     return new TraitItemFunc (*this);
   }
@@ -3155,7 +3127,9 @@ public:
 };
 
 // Actual trait item method declaration within traits
-class TraitItemMethod : public TraitItem
+class TraitItemMethod : public AssociatedItem,
+			public LocatedImpl,
+			public NodeIdStore
 {
   std::vector<Attribute> outer_attrs;
   TraitMethodDecl decl;
@@ -3167,17 +3141,15 @@ public:
 
   TraitItemMethod (TraitMethodDecl decl, std::unique_ptr<BlockExpr> block_expr,
 		   std::vector<Attribute> outer_attrs, location_t locus)
-    : TraitItem (locus), outer_attrs (std::move (outer_attrs)),
+    : LocatedImpl (locus), outer_attrs (std::move (outer_attrs)),
       decl (std::move (decl)), block_expr (std::move (block_expr))
   {}
 
   // Copy constructor with clone
   TraitItemMethod (TraitItemMethod const &other)
-    : TraitItem (other.locus), outer_attrs (other.outer_attrs),
+    : LocatedImpl (other), NodeIdStore (other), outer_attrs (other.outer_attrs),
       decl (other.decl)
   {
-    node_id = other.node_id;
-
     // guard to prevent null dereference
     if (other.block_expr != nullptr)
       block_expr = other.block_expr->clone_block_expr ();
@@ -3186,11 +3158,10 @@ public:
   // Overloaded assignment operator to clone
   TraitItemMethod &operator= (TraitItemMethod const &other)
   {
-    TraitItem::operator= (other);
+    LocatedImpl::operator= (other);
+    NodeIdStore::operator= (other);
     outer_attrs = other.outer_attrs;
     decl = other.decl;
-    locus = other.locus;
-    node_id = other.node_id;
 
     // guard to prevent null dereference
     if (other.block_expr != nullptr)
@@ -3232,14 +3203,16 @@ public:
 
 protected:
   // Clone function implementation as (not pure) virtual method
-  TraitItemMethod *clone_trait_item_impl () const override
+  TraitItemMethod *clone_associated_item_impl () const override
   {
     return new TraitItemMethod (*this);
   }
 };
 
 // Constant item within traits
-class TraitItemConst : public TraitItem
+class TraitItemConst : public AssociatedItem,
+		       public LocatedImpl,
+		       public NodeIdStore
 {
   std::vector<Attribute> outer_attrs;
   Identifier name;
@@ -3255,17 +3228,15 @@ public:
   TraitItemConst (Identifier name, std::unique_ptr<Type> type,
 		  std::unique_ptr<Expr> expr,
 		  std::vector<Attribute> outer_attrs, location_t locus)
-    : TraitItem (locus), outer_attrs (std::move (outer_attrs)),
+    : LocatedImpl (locus), outer_attrs (std::move (outer_attrs)),
       name (std::move (name)), type (std::move (type)), expr (std::move (expr))
   {}
 
   // Copy constructor with clones
   TraitItemConst (TraitItemConst const &other)
-    : TraitItem (other.locus), outer_attrs (other.outer_attrs),
+    : LocatedImpl (other), NodeIdStore (other), outer_attrs (other.outer_attrs),
       name (other.name)
   {
-    node_id = other.node_id;
-
     // guard to prevent null dereference
     if (other.expr != nullptr)
       expr = other.expr->clone_expr ();
@@ -3278,11 +3249,10 @@ public:
   // Overloaded assignment operator to clone
   TraitItemConst &operator= (TraitItemConst const &other)
   {
-    TraitItem::operator= (other);
+    LocatedImpl::operator= (other);
+    NodeIdStore::operator= (other);
     outer_attrs = other.outer_attrs;
     name = other.name;
-    locus = other.locus;
-    node_id = other.node_id;
 
     // guard to prevent null dereference
     if (other.expr != nullptr)
@@ -3304,8 +3274,6 @@ public:
   TraitItemConst &operator= (TraitItemConst &&other) = default;
 
   std::string as_string () const override;
-
-  location_t get_locus () const { return locus; }
 
   void accept_vis (ASTVisitor &vis) override;
 
@@ -3337,14 +3305,16 @@ public:
 
 protected:
   // Clone function implementation as (not pure) virtual method
-  TraitItemConst *clone_trait_item_impl () const override
+  TraitItemConst *clone_associated_item_impl () const override
   {
     return new TraitItemConst (*this);
   }
 };
 
 // Type items within traits
-class TraitItemType : public TraitItem
+class TraitItemType : public AssociatedItem,
+		      public LocatedImpl,
+		      public NodeIdStore
 {
   std::vector<Attribute> outer_attrs;
 
@@ -3362,16 +3332,15 @@ public:
   TraitItemType (Identifier name,
 		 std::vector<std::unique_ptr<TypeParamBound>> type_param_bounds,
 		 std::vector<Attribute> outer_attrs, location_t locus)
-    : TraitItem (locus), outer_attrs (std::move (outer_attrs)),
+    : LocatedImpl (locus), outer_attrs (std::move (outer_attrs)),
       name (std::move (name)), type_param_bounds (std::move (type_param_bounds))
   {}
 
   // Copy constructor with vector clone
   TraitItemType (TraitItemType const &other)
-    : TraitItem (other.locus), outer_attrs (other.outer_attrs),
+    : LocatedImpl (other), NodeIdStore (other), outer_attrs (other.outer_attrs),
       name (other.name)
   {
-    node_id = other.node_id;
     type_param_bounds.reserve (other.type_param_bounds.size ());
     for (const auto &e : other.type_param_bounds)
       type_param_bounds.push_back (e->clone_type_param_bound ());
@@ -3380,11 +3349,10 @@ public:
   // Overloaded assignment operator with vector clone
   TraitItemType &operator= (TraitItemType const &other)
   {
-    TraitItem::operator= (other);
+    LocatedImpl::operator= (other);
+    NodeIdStore::operator= (other);
     outer_attrs = other.outer_attrs;
     name = other.name;
-    locus = other.locus;
-    node_id = other.node_id;
 
     type_param_bounds.reserve (other.type_param_bounds.size ());
     for (const auto &e : other.type_param_bounds)
@@ -3424,7 +3392,7 @@ public:
 
 protected:
   // Clone function implementation as (not pure) virtual method
-  TraitItemType *clone_trait_item_impl () const override
+  TraitItemType *clone_associated_item_impl () const override
   {
     return new TraitItemType (*this);
   }
@@ -3440,7 +3408,7 @@ class Trait : public VisItem
   std::vector<std::unique_ptr<TypeParamBound>> type_param_bounds;
   WhereClause where_clause;
   std::vector<Attribute> inner_attrs;
-  std::vector<std::unique_ptr<TraitItem>> trait_items;
+  std::vector<std::unique_ptr<AssociatedItem>> trait_items;
   location_t locus;
 
 public:
@@ -3471,9 +3439,9 @@ public:
 	 std::vector<std::unique_ptr<GenericParam>> generic_params,
 	 std::vector<std::unique_ptr<TypeParamBound>> type_param_bounds,
 	 WhereClause where_clause,
-	 std::vector<std::unique_ptr<TraitItem>> trait_items, Visibility vis,
-	 std::vector<Attribute> outer_attrs, std::vector<Attribute> inner_attrs,
-	 location_t locus)
+	 std::vector<std::unique_ptr<AssociatedItem>> trait_items,
+	 Visibility vis, std::vector<Attribute> outer_attrs,
+	 std::vector<Attribute> inner_attrs, location_t locus)
     : VisItem (std::move (vis), std::move (outer_attrs)),
       has_unsafe (is_unsafe), has_auto (is_auto), name (std::move (name)),
       generic_params (std::move (generic_params)),
@@ -3499,7 +3467,7 @@ public:
 
     trait_items.reserve (other.trait_items.size ());
     for (const auto &e : other.trait_items)
-      trait_items.push_back (e->clone_trait_item ());
+      trait_items.push_back (e->clone_associated_item ());
   }
 
   // Overloaded assignment operator with vector clone
@@ -3523,7 +3491,7 @@ public:
 
     trait_items.reserve (other.trait_items.size ());
     for (const auto &e : other.trait_items)
-      trait_items.push_back (e->clone_trait_item ());
+      trait_items.push_back (e->clone_associated_item ());
 
     return *this;
   }
@@ -3544,11 +3512,11 @@ public:
   const std::vector<Attribute> &get_inner_attrs () const { return inner_attrs; }
   std::vector<Attribute> &get_inner_attrs () { return inner_attrs; }
 
-  const std::vector<std::unique_ptr<TraitItem>> &get_trait_items () const
+  const std::vector<std::unique_ptr<AssociatedItem>> &get_trait_items () const
   {
     return trait_items;
   }
-  std::vector<std::unique_ptr<TraitItem>> &get_trait_items ()
+  std::vector<std::unique_ptr<AssociatedItem>> &get_trait_items ()
   {
     return trait_items;
   }
@@ -3711,7 +3679,7 @@ protected:
 class InherentImpl : public Impl
 {
   // bool has_impl_items;
-  std::vector<std::unique_ptr<InherentImplItem>> impl_items;
+  std::vector<std::unique_ptr<AssociatedItem>> impl_items;
 
 public:
   std::string as_string () const override;
@@ -3720,7 +3688,7 @@ public:
   bool has_impl_items () const { return !impl_items.empty (); }
 
   // Mega-constructor
-  InherentImpl (std::vector<std::unique_ptr<InherentImplItem>> impl_items,
+  InherentImpl (std::vector<std::unique_ptr<AssociatedItem>> impl_items,
 		std::vector<std::unique_ptr<GenericParam>> generic_params,
 		std::unique_ptr<Type> trait_type, WhereClause where_clause,
 		Visibility vis, std::vector<Attribute> inner_attrs,
@@ -3736,7 +3704,7 @@ public:
   {
     impl_items.reserve (other.impl_items.size ());
     for (const auto &e : other.impl_items)
-      impl_items.push_back (e->clone_inherent_impl_item ());
+      impl_items.push_back (e->clone_associated_item ());
   }
 
   // Overloaded assignment operator with vector clone
@@ -3746,7 +3714,7 @@ public:
 
     impl_items.reserve (other.impl_items.size ());
     for (const auto &e : other.impl_items)
-      impl_items.push_back (e->clone_inherent_impl_item ());
+      impl_items.push_back (e->clone_associated_item ());
 
     return *this;
   }
@@ -3758,11 +3726,11 @@ public:
   void accept_vis (ASTVisitor &vis) override;
 
   // TODO: think of better way to do this
-  const std::vector<std::unique_ptr<InherentImplItem>> &get_impl_items () const
+  const std::vector<std::unique_ptr<AssociatedItem>> &get_impl_items () const
   {
     return impl_items;
   }
-  std::vector<std::unique_ptr<InherentImplItem>> &get_impl_items ()
+  std::vector<std::unique_ptr<AssociatedItem>> &get_impl_items ()
   {
     return impl_items;
   }
@@ -3784,7 +3752,7 @@ class TraitImpl : public Impl
   TypePath trait_path;
 
   // bool has_impl_items;
-  std::vector<std::unique_ptr<TraitImplItem>> impl_items;
+  std::vector<std::unique_ptr<AssociatedItem>> impl_items;
 
 public:
   std::string as_string () const override;
@@ -3794,7 +3762,7 @@ public:
 
   // Mega-constructor
   TraitImpl (TypePath trait_path, bool is_unsafe, bool has_exclam,
-	     std::vector<std::unique_ptr<TraitImplItem>> impl_items,
+	     std::vector<std::unique_ptr<AssociatedItem>> impl_items,
 	     std::vector<std::unique_ptr<GenericParam>> generic_params,
 	     std::unique_ptr<Type> trait_type, WhereClause where_clause,
 	     Visibility vis, std::vector<Attribute> inner_attrs,
@@ -3813,7 +3781,7 @@ public:
   {
     impl_items.reserve (other.impl_items.size ());
     for (const auto &e : other.impl_items)
-      impl_items.push_back (e->clone_trait_impl_item ());
+      impl_items.push_back (e->clone_associated_item ());
   }
 
   // Overloaded assignment operator with vector clone
@@ -3826,7 +3794,7 @@ public:
 
     impl_items.reserve (other.impl_items.size ());
     for (const auto &e : other.impl_items)
-      impl_items.push_back (e->clone_trait_impl_item ());
+      impl_items.push_back (e->clone_associated_item ());
 
     return *this;
   }
@@ -3841,11 +3809,11 @@ public:
   bool is_exclam () const { return has_exclam; }
 
   // TODO: think of better way to do this
-  const std::vector<std::unique_ptr<TraitImplItem>> &get_impl_items () const
+  const std::vector<std::unique_ptr<AssociatedItem>> &get_impl_items () const
   {
     return impl_items;
   }
-  std::vector<std::unique_ptr<TraitImplItem>> &get_impl_items ()
+  std::vector<std::unique_ptr<AssociatedItem>> &get_impl_items ()
   {
     return impl_items;
   }
@@ -3957,21 +3925,19 @@ class ExternalTypeItem : public ExternalItem
 public:
   ExternalTypeItem (Identifier item_name, Visibility vis,
 		    std::vector<Attribute> outer_attrs, location_t locus)
-    : ExternalItem (), outer_attrs (std::move (outer_attrs)), visibility (vis),
+    : outer_attrs (std::move (outer_attrs)), visibility (vis),
       item_name (std::move (item_name)), locus (locus), marked_for_strip (false)
   {}
 
   ExternalTypeItem (ExternalTypeItem const &other)
-    : outer_attrs (other.outer_attrs), visibility (other.visibility),
-      item_name (other.item_name), locus (other.locus),
-      marked_for_strip (other.marked_for_strip)
-  {
-    node_id = other.node_id;
-  }
+    : ExternalItem (other), outer_attrs (other.outer_attrs),
+      visibility (other.visibility), item_name (other.item_name),
+      locus (other.locus), marked_for_strip (other.marked_for_strip)
+  {}
 
   ExternalTypeItem &operator= (ExternalTypeItem const &other)
   {
-    node_id = other.node_id;
+    ExternalItem::operator= (other);
     outer_attrs = other.outer_attrs;
     visibility = other.visibility;
     item_name = other.item_name;
@@ -4037,17 +4003,17 @@ public:
   ExternalStaticItem (Identifier item_name, std::unique_ptr<Type> item_type,
 		      bool is_mut, Visibility vis,
 		      std::vector<Attribute> outer_attrs, location_t locus)
-    : ExternalItem (), outer_attrs (std::move (outer_attrs)),
-      visibility (std::move (vis)), item_name (std::move (item_name)),
-      locus (locus), has_mut (is_mut), item_type (std::move (item_type))
+    : outer_attrs (std::move (outer_attrs)), visibility (std::move (vis)),
+      item_name (std::move (item_name)), locus (locus), has_mut (is_mut),
+      item_type (std::move (item_type))
   {}
 
   // Copy constructor
   ExternalStaticItem (ExternalStaticItem const &other)
-    : outer_attrs (other.outer_attrs), visibility (other.visibility),
-      item_name (other.item_name), locus (other.locus), has_mut (other.has_mut)
+    : ExternalItem (other), outer_attrs (other.outer_attrs),
+      visibility (other.visibility), item_name (other.item_name),
+      locus (other.locus), has_mut (other.has_mut)
   {
-    node_id = other.node_id;
     // guard to prevent null dereference (only required if error state)
     if (other.item_type != nullptr)
       item_type = other.item_type->clone_type ();
@@ -4056,7 +4022,7 @@ public:
   // Overloaded assignment operator to clone
   ExternalStaticItem &operator= (ExternalStaticItem const &other)
   {
-    node_id = other.node_id;
+    ExternalItem::operator= (other);
     outer_attrs = other.outer_attrs;
     visibility = other.visibility;
     item_name = other.item_name;
@@ -4282,9 +4248,9 @@ public:
     std::vector<NamedFunctionParam> function_params, bool has_variadics,
     std::vector<Attribute> variadic_outer_attrs, Visibility vis,
     std::vector<Attribute> outer_attrs, location_t locus)
-    : ExternalItem (), outer_attrs (std::move (outer_attrs)),
-      visibility (std::move (vis)), item_name (std::move (item_name)),
-      locus (locus), generic_params (std::move (generic_params)),
+    : outer_attrs (std::move (outer_attrs)), visibility (std::move (vis)),
+      item_name (std::move (item_name)), locus (locus),
+      generic_params (std::move (generic_params)),
       return_type (std::move (return_type)),
       where_clause (std::move (where_clause)),
       function_params (std::move (function_params)),
@@ -4297,14 +4263,13 @@ public:
 
   // Copy constructor with clone
   ExternalFunctionItem (ExternalFunctionItem const &other)
-    : outer_attrs (other.outer_attrs), visibility (other.visibility),
-      item_name (other.item_name), locus (other.locus),
-      where_clause (other.where_clause),
+    : ExternalItem (other), outer_attrs (other.outer_attrs),
+      visibility (other.visibility), item_name (other.item_name),
+      locus (other.locus), where_clause (other.where_clause),
       function_params (other.function_params),
       has_variadics (other.has_variadics),
       variadic_outer_attrs (other.variadic_outer_attrs)
   {
-    node_id = other.node_id;
     // guard to prevent null pointer dereference
     if (other.return_type != nullptr)
       return_type = other.return_type->clone_type ();
@@ -4317,6 +4282,7 @@ public:
   // Overloaded assignment operator with clone
   ExternalFunctionItem &operator= (ExternalFunctionItem const &other)
   {
+    ExternalItem::operator= (other);
     outer_attrs = other.outer_attrs;
     visibility = other.visibility;
     item_name = other.item_name;
@@ -4325,7 +4291,6 @@ public:
     function_params = other.function_params;
     has_variadics = other.has_variadics;
     variadic_outer_attrs = other.variadic_outer_attrs;
-    node_id = other.node_id;
 
     // guard to prevent null pointer dereference
     if (other.return_type != nullptr)

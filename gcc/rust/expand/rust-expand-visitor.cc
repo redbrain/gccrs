@@ -1186,8 +1186,9 @@ ExpandVisitor::visit (AST::Trait &trait)
 
   expander.push_context (MacroExpander::ContextType::TRAIT);
 
-  std::function<std::unique_ptr<AST::TraitItem> (AST::SingleASTNode)> extractor
-    = [] (AST::SingleASTNode node) { return node.take_trait_item (); };
+  std::function<std::unique_ptr<AST::AssociatedItem> (AST::SingleASTNode)>
+    extractor
+    = [] (AST::SingleASTNode node) { return node.take_assoc_item (); };
 
   expand_macro_children (MacroExpander::ContextType::TRAIT,
 			 trait.get_trait_items (), extractor);
@@ -1213,8 +1214,9 @@ ExpandVisitor::visit (AST::InherentImpl &impl)
   if (impl.has_where_clause ())
     expand_where_clause (impl.get_where_clause ());
 
-  std::function<std::unique_ptr<AST::InherentImplItem> (AST::SingleASTNode)>
-    extractor = [] (AST::SingleASTNode node) { return node.take_impl_item (); };
+  std::function<std::unique_ptr<AST::AssociatedItem> (AST::SingleASTNode)>
+    extractor
+    = [] (AST::SingleASTNode node) { return node.take_assoc_item (); };
 
   expand_macro_children (MacroExpander::ContextType::IMPL,
 			 impl.get_impl_items (), extractor);
@@ -1240,9 +1242,9 @@ ExpandVisitor::visit (AST::TraitImpl &impl)
   if (impl.has_where_clause ())
     expand_where_clause (impl.get_where_clause ());
 
-  std::function<std::unique_ptr<AST::TraitImplItem> (AST::SingleASTNode)>
+  std::function<std::unique_ptr<AST::AssociatedItem> (AST::SingleASTNode)>
     extractor
-    = [] (AST::SingleASTNode node) { return node.take_trait_impl_item (); };
+    = [] (AST::SingleASTNode node) { return node.take_assoc_item (); };
 
   expand_macro_children (MacroExpander::ContextType::TRAIT_IMPL,
 			 impl.get_impl_items (), extractor);
