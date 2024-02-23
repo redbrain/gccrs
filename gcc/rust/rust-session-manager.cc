@@ -933,7 +933,7 @@ Session::expansion (AST::Crate &crate, Resolver2_0::NameResolutionContext &ctx)
       // Errors might happen during cfg strip pass
       bool visitor_dirty = false;
 
-      if (flag_name_resolution_2_0)
+      if (true /*flag_name_resolution_2_0*/)
 	{
 	  Resolver2_0::Early early (ctx);
 	  early.go (crate);
