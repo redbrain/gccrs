@@ -57,6 +57,10 @@ TopLevel::insert_or_error_out (const Identifier &identifier,
       rust_error_at (rich_loc, ErrorCode::E0428, "%qs defined multiple times",
 		     identifier.as_string ().c_str ());
     }
+  // HACK: ignore macro namespace for change detection
+  // we get infinite loops otherwise, since macros can shadow each other
+  else if (ns != Namespace::Macros)
+    mark_changed ();
 }
 
 void

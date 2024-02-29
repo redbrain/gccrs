@@ -141,6 +141,11 @@ public:
     return std::move (imports_to_resolve);
   }
 
+  bool has_changed () { return f_has_changed; }
+
+  std::vector<Error> &get_errors () { return error_queue; }
+
+private:
   /**
    * Insert a new definition or error out if a definition with the same name was
    * already present in the same namespace in the same scope.
@@ -195,6 +200,9 @@ private:
   void visit (AST::ExternCrate &crate) override;
   void visit (AST::TypeParam &type_param) override;
   void visit (AST::ConstGenericParam &const_param) override;
+
+  std::vector<Error> error_queue;
+  void collect_error (Error err) { error_queue.push_back (std::move (err)); }
 
   void visit (AST::UseDeclaration &use) override;
 };
