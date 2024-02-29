@@ -36,7 +36,10 @@ Early::insert_once (AST::MacroInvocation &invocation, NodeId resolved)
   auto definition = ctx.mappings.lookup_macro_def (resolved);
 
   if (!ctx.mappings.lookup_macro_invocation (invocation))
-    ctx.mappings.insert_macro_invocation (invocation, definition.value ());
+    {
+      ctx.mappings.insert_macro_invocation (invocation, definition.value ());
+      mark_changed ();
+    }
 }
 
 void
@@ -44,7 +47,10 @@ Early::insert_once (AST::MacroRulesDefinition &def)
 {
   // TODO: Should we use `ctx.mark_resolved()`?
   if (!ctx.mappings.lookup_macro_def (def.get_node_id ()))
-    ctx.mappings.insert_macro_def (&def);
+    {
+      ctx.mappings.insert_macro_def (&def);
+      mark_changed ();
+    }
 }
 
 void
