@@ -29,30 +29,6 @@
 namespace Rust {
 namespace Resolver2_0 {
 
-class GlobbingVisitor : public AST::DefaultASTVisitor
-{
-  using AST::DefaultASTVisitor::visit;
-
-public:
-  GlobbingVisitor (NameResolutionContext &ctx) : ctx (ctx) {}
-
-  void go (AST::Module *module);
-  void visit (AST::Module &module) override;
-  void visit (AST::MacroRulesDefinition &macro) override;
-  void visit (AST::Function &function) override;
-  void visit (AST::StaticItem &static_item) override;
-  void visit (AST::StructStruct &struct_item) override;
-  void visit (AST::TupleStruct &tuple_struct) override;
-  void visit (AST::Enum &enum_item) override;
-  void visit (AST::Union &union_item) override;
-  void visit (AST::ConstantItem &const_item) override;
-  void visit (AST::ExternCrate &crate) override;
-  void visit (AST::UseDeclaration &use) override;
-
-private:
-  NameResolutionContext &ctx;
-};
-
 // required for TopLevel
 class Import;
 
@@ -141,11 +117,8 @@ public:
     return std::move (imports_to_resolve);
   }
 
-  bool has_changed () { return f_has_changed; }
-
   std::vector<Error> &get_errors () { return error_queue; }
 
-private:
   /**
    * Insert a new definition or error out if a definition with the same name was
    * already present in the same namespace in the same scope.
