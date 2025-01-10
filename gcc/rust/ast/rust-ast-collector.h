@@ -23,6 +23,8 @@
 #include "rust-ast-visitor.h"
 #include "rust-ast.h"
 #include "rust-ast-full.h"
+#include "rust-system.h"
+#include <functional>
 
 namespace Rust {
 namespace AST {
@@ -33,13 +35,23 @@ public:
   enum class Kind
   {
     Comment,
+    InternalComment,
     Newline,
     Indentation,
     Token,
   };
 
+  enum class Comment
+  {
+    Regular,
+    Internal,
+  };
+
   CollectItem (TokenPtr token) : token (token), kind (Kind::Token) {}
-  CollectItem (std::string comment) : comment (comment), kind (Kind::Comment) {}
+  CollectItem (std::string comment, Comment type = Comment::Regular)
+    : comment (comment),
+      kind (type == Comment::Internal ? Kind::InternalComment : Kind::Comment)
+  {}
   CollectItem (Kind kind) : kind (kind) { rust_assert (kind != Kind::Token); }
   CollectItem (size_t level) : indent_level (level), kind (Kind::Indentation) {}
 
@@ -63,11 +75,20 @@ public:
     return indent_level;
   }
 
+  std::string get_internal_comment ()
+  {
+    rust_assert (kind == Kind::InternalComment);
+    return comment;
+  }
+
+  bool is_debug () { return debug; }
+
 private:
   TokenPtr token;
   std::string comment;
   size_t indent_level;
   Kind kind;
+  bool debug = false;
 };
 
 class TokenCollector : public ASTVisitor
@@ -164,12 +185,16 @@ private:
       }
   }
 
+  void internal_comment (std::string node_name, std::function<void ()> visitor);
+
   void trailing_comma ();
   void newline ();
   void indentation ();
   void increment_indentation ();
   void decrement_indentation ();
   void comment (std::string comment);
+  void begin_internal_comment (std::string internalcomment);
+  void end_internal_comment (std::string internalcomment);
   /**
    * Visit common items of functions: Parameters, return type, block
    */

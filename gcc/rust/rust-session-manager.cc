@@ -1,4 +1,4 @@
-// Copyright (C) 2020-2024 Free Software Foundation, Inc.
+// Copyright (C) 2020 - 2024 Free Software Foundation, Inc.
 
 // This file is part of GCC.
 
@@ -21,6 +21,7 @@
 #include "rust-diagnostics.h"
 #include "rust-hir-pattern-analysis.h"
 #include "rust-immutable-name-resolution-context.h"
+#include "rust-location.h"
 #include "rust-unsafe-checker.h"
 #include "rust-lex.h"
 #include "rust-parse.h"
@@ -58,6 +59,7 @@
 #include "selftest.h"
 #include "tm.h"
 #include "rust-target.h"
+#include "rust-system.h"
 
 extern bool
 saw_errors (void);
@@ -70,6 +72,7 @@ namespace Rust {
 const char *kLexDumpFile = "gccrs.lex.dump";
 const char *kASTDumpFile = "gccrs.ast.dump";
 const char *kASTPrettyDumpFile = "gccrs.ast-pretty.dump";
+const char *kASTPrettyInternalDumpFile = "gccrs.ast-pretty-internal.dump";
 const char *kASTPrettyDumpFileExpanded = "gccrs.ast-pretty-expanded.dump";
 const char *kASTExpandedDumpFile = "gccrs.ast-expanded.dump";
 const char *kASTmacroResolutionDumpFile = "gccrs.ast-macro-resolution.dump";
@@ -376,6 +379,27 @@ Session::enable_dump (std::string arg)
     {
       options.enable_dump_option (CompileOptions::BIR_DUMP);
     }
+  else if (!arg.compare (0, 8, "internal"))
+    {
+      if (arg.size () == 8)
+	{
+	  options.enable_dump_option (CompileOptions::INTERNAL_DUMP);
+	}
+      else
+	{
+	  if (arg[8] != ':')
+	    {
+	      rust_error_at (UNDEF_LOCATION,
+			     "%qs malformated to specify Node to ignore when "
+			     "dumping internal comment put a "
+			     "%qs then all the Nodes separated by comma",
+			     arg.c_str (), ":");
+	      return false;
+	    }
+	  handle_excluded_node (arg);
+	  options.enable_dump_option (CompileOptions::INTERNAL_DUMP);
+	}
+    }
   else
     {
       rust_error_at (
@@ -388,6 +412,22 @@ Session::enable_dump (std::string arg)
       return false;
     }
   return true;
+}
+
+/* Helper function to parse a string when dump internal to get node to blacklist
+ */
+
+void
+Session::handle_excluded_node (std::string arg)
+{
+  const int size_node_string = 50;
+  std::istringstream blist_str (
+    arg.substr (arg.find (":") + 1, size_node_string));
+  std::string token;
+  while (std::getline (blist_str, token, ','))
+    {
+      options.add_excluded (token);
+    }
 }
 
 /* Actual main entry point for front-end. Called from langhook to parse files.
@@ -545,6 +585,10 @@ Session::compile_crate (const char *filename)
   if (options.dump_option_enabled (CompileOptions::AST_DUMP_PRETTY))
     {
       dump_ast_pretty (*ast_crate.get ());
+    }
+  if (options.dump_option_enabled (CompileOptions::INTERNAL_DUMP))
+    {
+      dump_ast_pretty_internal (*ast_crate.get ());
     }
   if (options.dump_option_enabled (CompileOptions::TARGET_OPTION_DUMP))
     {
@@ -1001,6 +1045,26 @@ Session::dump_ast_pretty (AST::Crate &crate, bool expanded) const
     }
 
   AST::Dump (out).go (crate);
+
+  out.close ();
+}
+
+void
+Session::dump_ast_pretty_internal (AST::Crate &crate) const
+{
+  std::ofstream out;
+  out.open (kASTPrettyInternalDumpFile);
+
+  if (out.fail ())
+    {
+      rust_error_at (UNKNOWN_LOCATION, "cannot open %s:%m; ignored",
+		     kASTDumpFile);
+      return;
+    }
+
+  std::set<std::string> str_tmp = options.get_excluded ();
+
+  AST::Dump (out, true, str_tmp).go (crate);
 
   out.close ();
 }
