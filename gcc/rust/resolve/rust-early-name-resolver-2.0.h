@@ -164,6 +164,9 @@ public:
     std::unordered_map<NodeId, std::vector<ImportPair>> mappings;
   };
 
+  bool has_changed () const { return dirty; }
+  void mark_changed () { dirty = true; }
+
 private:
   void visit_attributes (std::vector<AST::Attribute> &attrs);
 

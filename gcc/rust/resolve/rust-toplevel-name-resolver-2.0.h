@@ -29,6 +29,9 @@
 namespace Rust {
 namespace Resolver2_0 {
 
+// required for TopLevel
+class Import;
+
 /**
  * The `TopLevel` visitor takes care of collecting all the definitions in a
  * crate, and inserting them into the proper namespaces. These definitions can
@@ -114,6 +117,8 @@ public:
     return std::move (imports_to_resolve);
   }
 
+  std::vector<Error> &get_errors () { return error_queue; }
+
   /**
    * Insert a new definition or error out if a definition with the same name was
    * already present in the same namespace in the same scope.
@@ -169,7 +174,39 @@ private:
   void visit (AST::TypeParam &type_param) override;
   void visit (AST::ConstGenericParam &const_param) override;
 
+  std::vector<Error> error_queue;
+  void collect_error (Error err) { error_queue.push_back (std::move (err)); }
+
   void visit (AST::UseDeclaration &use) override;
+};
+
+/**
+ * Used to store individual imports
+ * Required for handling rebindings, glob imports
+ */
+class Import
+{
+public:
+  Import (AST::SimplePath path, bool is_glob, std::string name)
+    : path (path), is_glob_f (is_glob), name (name)
+  {}
+
+  AST::SimplePath &get_path () { return path; }
+
+  const AST::SimplePath &get_path () const { return path; }
+
+  bool is_glob () const { return is_glob_f; }
+
+  const std::string &get_name () const { return name; }
+
+  std::string &get_name () { return name; }
+
+  void add_prefix (AST::SimplePath prefix);
+
+private:
+  AST::SimplePath path;
+  bool is_glob_f;
+  std::string name;
 };
 
 } // namespace Resolver2_0
